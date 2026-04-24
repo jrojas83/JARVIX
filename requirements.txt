@@ -1,0 +1,39 @@
+# Jarvis v7 — Dependencias Python
+# Instalar con: pip install -r requirements.txt
+# (el instalador instalar.sh hace esto automáticamente en un venv)
+
+# ── Red y APIs ────────────────────────────────────────────────
+requests>=2.31.0
+python-dotenv>=1.0.0
+httpx>=0.27.0
+
+# ── IAs en línea ──────────────────────────────────────────────
+groq>=0.4.0
+google-generativeai>=0.5.0   # SDK legacy (funcional, deprecation warning)
+google-genai>=1.0.0          # SDK nuevo recomendado (silencia FutureWarning)
+anthropic>=0.20.0
+
+# ── Voz ───────────────────────────────────────────────────────
+SpeechRecognition>=3.10.0
+pyttsx3>=2.90
+pyaudio>=0.2.13
+
+# ── Automatización ────────────────────────────────────────────
+selenium>=4.18.0
+webdriver-manager>=4.0.0
+
+# ── Sistema ───────────────────────────────────────────────────
+psutil>=5.9.0
+
+# ── Base de datos ─────────────────────────────────────────────
+# sqlite3 ya viene incluido en Python estándar — no necesita instalación
+
+# ── v7: Nuevas funcionalidades ────────────────────────────────
+# NOTA: cache.py, consola.py, diagnostico.py y plugins/ NO requieren
+# nuevas dependencias — usan solo stdlib + paquetes ya listados arriba.
+#
+# Plugins opcionales (instalar solo si usas ese plugin):
+#   chromadb>=0.4.0              # RAG sobre documentos locales (Fase 2)
+#   sentence-transformers>=2.2.0 # Embeddings para RAG (Fase 2)
+#   flask>=3.0.0                 # Interfaz web localhost:5000 (Fase 2)
+

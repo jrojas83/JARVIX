@@ -1,0 +1,33 @@
+# ─── Seguridad: NUNCA subir ───────────────────────────────────
+.env
+*.env
+config_local.py
+
+# ─── Datos personales generados en tiempo de ejecución ────────
+memoria.json
+.jarvis.log
+
+# ─── Python ───────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# ─── Sistema ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+
+# ─── IDEs ─────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.iml
