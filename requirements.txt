@@ -36,6 +36,9 @@ psutil>=5.9.0
 #
 # Plugins opcionales (instalar solo si usas ese plugin):
 #   chromadb>=0.4.0              # RAG sobre documentos locales (Fase 2)
-#   sentence-transformers>=2.2.0 # Embeddings para RAG (Fase 2)
 #   flask>=3.0.0                 # Interfaz web localhost:5000 (Fase 2)
+
+# ── Cache Semántica e Intent Matcher (v9) ─────────────────────
+sentence-transformers>=2.7.0
+numpy>=1.24.0
 
