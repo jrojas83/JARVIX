@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from logger import log
 
-from jarvis_core.ai.providers import call_anthropic, call_gemini, call_groq, call_ollama
+from jarvis_core.ai.providers import call_ollama
 from jarvis_core.ai.types import AiRequest, AiResponse
 from jarvis_core.core.circuit_breaker import CircuitBreaker
 from jarvis_core.core.retry import RetryPolicy, with_retry
@@ -15,9 +15,6 @@ from jarvis_core.core.retry import RetryPolicy, with_retry
 @dataclass(frozen=True)
 class OrchestratorConfig:
     # Timeouts por proveedor (segundos)
-    groq_timeout_s: float = 6.0
-    gemini_timeout_s: float = 6.0
-    anthropic_timeout_s: float = 8.0
     ollama_timeout_s: float = 40.0
 
     # Resiliencia
@@ -28,8 +25,8 @@ class OrchestratorConfig:
 
 class AiOrchestrator:
     """
-    Orquestador async:
-    - 'first model wins': lanza providers en paralelo y usa el primero que responda bien.
+    Orquestador async para IAs locales:
+    - Solo soporta Ollama (IA local)
     - timeouts por proveedor
     - retries con backoff
     - circuit breaker por proveedor
@@ -38,18 +35,10 @@ class AiOrchestrator:
     def __init__(
         self,
         *,
-        groq_api_key: str = "",
-        gemini_api_key: str = "",
-        anthropic_api_key: str = "",
-        anthropic_model: str = "claude-haiku-4-5-20251001",
         ollama_url: str = "http://localhost:11434/api/generate",
         ollama_model: str = "qwen2.5:3b",
         config: OrchestratorConfig = OrchestratorConfig(),
     ):
-        self.groq_api_key = groq_api_key
-        self.gemini_api_key = gemini_api_key
-        self.anthropic_api_key = anthropic_api_key
-        self.anthropic_model = anthropic_model
         self.ollama_url = ollama_url
         self.ollama_model = ollama_model
         self.cfg = config
@@ -59,28 +48,17 @@ class AiOrchestrator:
         )
 
     def _provider_candidates(self, mode: str) -> list[str]:
-        mode = (mode or "auto").lower().strip()
-        if mode == "ollama":
-            return ["ollama"]
-        if mode in ("groq", "gemini", "anthropic"):
-            return [mode]
-        # auto
-        return ["groq", "gemini", "anthropic", "ollama"]
+        # Solo soporta ollama
+        return ["ollama"]
 
     async def ask(self, prompt: str, history: list[dict] | None = None, *, mode: str = "auto") -> AiResponse | None:
         req = AiRequest(prompt=prompt, history=history or [])
         candidates = self._provider_candidates(mode)
 
-        # Filtra por circuit breaker y keys
+        # Filtra por circuit breaker
         viable: list[str] = []
         for p in candidates:
             if not self.cb.allow(p):
-                continue
-            if p == "groq" and not self.groq_api_key:
-                continue
-            if p == "gemini" and not self.gemini_api_key:
-                continue
-            if p == "anthropic" and not self.anthropic_api_key:
                 continue
             viable.append(p)
 
@@ -89,17 +67,6 @@ class AiOrchestrator:
 
         async def _call(provider: str) -> AiResponse | None:
             async def _attempt() -> AiResponse | None:
-                if provider == "groq":
-                    return await call_groq(req, api_key=self.groq_api_key, timeout_s=self.cfg.groq_timeout_s)
-                if provider == "gemini":
-                    return await call_gemini(req, api_key=self.gemini_api_key, timeout_s=self.cfg.gemini_timeout_s)
-                if provider == "anthropic":
-                    return await call_anthropic(
-                        req,
-                        api_key=self.anthropic_api_key,
-                        model=self.anthropic_model,
-                        timeout_s=self.cfg.anthropic_timeout_s,
-                    )
                 if provider == "ollama":
                     return await call_ollama(
                         req,

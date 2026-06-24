@@ -11,15 +11,15 @@ load_dotenv(os.path.join(_BASE_DIR, ".env"))
 
 HOME = os.path.expanduser("~")
 
-# ─── API Keys — leídas desde .env ─────────────────────────────
-GROQ_API_KEY        = os.getenv("GROQ_API_KEY", "")
-GEMINI_API_KEY      = os.getenv("GEMINI_API_KEY", "")
-ANTHROPIC_API_KEY   = os.getenv("ANTHROPIC_API_KEY", "")
+# ─── API Keys — leídas desde .env (ya no usadas para IAs online) ─────────────────────────────
+# Nota: Las IAs online han sido eliminadas. Solo se soporta Ollama (IA local).
+GROQ_API_KEY        = ""  # No usado
+GEMINI_API_KEY      = ""  # No usado
+ANTHROPIC_API_KEY   = ""  # No usado
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
 # ─── Preferencias ─────────────────────────────────────────────
 CIUDAD_DEFAULT     = os.getenv("CIUDAD_DEFAULT", "Cali,CO")
-IA_PREFERIDA       = os.getenv("IA_PREFERIDA", "auto")
 MODELO             = os.getenv("MODELO_OLLAMA", "qwen2.5:3b")
 PALABRA_ACTIVACION = os.getenv("PALABRA_ACTIVACION", "jarvis")
 
@@ -101,7 +101,7 @@ MODELOS_OLLAMA = [
     "llama3.1:8b",
 ]
 
-MODELO_ONLINE = "claude-haiku-4-5-20251001"
+# MODELO_ONLINE eliminado - ya no se soportan IAs online
 
 # ─── Voz ──────────────────────────────────────────────────────
 TIMEOUT_ESCUCHA = 5

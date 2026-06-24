@@ -23,22 +23,28 @@
 #   (ej: "hora" solo puede capturar "temperatura", mejor "qué hora")
 # ════════════════════════════════════════════════════════════════════
 
+from functools import lru_cache
+
 # ─── Sistema y control ────────────────────────────────────────────
 # Detecta peticiones de hora, fecha, información del sistema y salida.
-PATRONES_HORA = [
+# Optimización: usar tuplas en lugar de listas para búsqueda más rápida
+PATRONES_HORA = (
     "qué hora es", "que hora es", "dime la hora", "qué horas son",
     "que horas son", "dime qué hora es", "hora actual",
     "qué hora tienes", "que hora tienes",
-]
+)
 
-PATRONES_FECHA = [
+PATRONES_FECHA = (
+
     "qué día es", "que dia es", "fecha de hoy", "qué fecha es",
     "que fecha es", "qué fecha tenemos", "que fecha tenemos",
     "cuál es la fecha", "cual es la fecha", "dime la fecha",
     "qué día es hoy", "que dia es hoy",
-]
 
-PATRONES_SISTEMA = [
+)
+
+PATRONES_SISTEMA = (
+
     "cómo está el sistema", "como esta el sistema",
     "info del sistema", "información del sistema",
     "estado del sistema", "recursos del sistema",
@@ -46,217 +52,280 @@ PATRONES_SISTEMA = [
     "cuánta ram", "cuanta ram", "uso de cpu",
     "espacio en disco", "cuánto disco", "cuanto disco",
     "rendimiento del sistema",
-]
+
+)
 
 # Palabras exactas de salida (se comparan con ==, no "in")
-PATRONES_SALIR = [
+PATRONES_SALIR = (
+
     "salir", "adios", "adiós", "hasta luego", "cerrar jarvis",
     "apaga jarvis", "cierra jarvis", "exit", "bye", "chao",
     "nos vemos", "hasta pronto",
-]
+
+)
 
 # ─── Volumen ──────────────────────────────────────────────────────
-PATRONES_VOL_SUBIR = [
+PATRONES_VOL_SUBIR = (
+
     "sube el volumen", "más volumen", "subir volumen",
     "sube el audio", "más audio", "volumen más alto",
     "aumenta el volumen", "aumenta el audio",
     "sube el sonido", "más sonido", "súbele al volumen",
     "subele al volumen", "pon más volumen",
-]
 
-PATRONES_VOL_BAJAR = [
+)
+
+PATRONES_VOL_BAJAR = (
+
     "baja el volumen", "menos volumen", "bajar volumen",
     "baja el audio", "menos audio", "volumen más bajo",
     "disminuye el volumen", "baja el sonido",
     "menos sonido", "bájale al volumen", "bajale al volumen",
-]
 
-PATRONES_VOL_SILENCIO = [
+)
+
+PATRONES_VOL_SILENCIO = (
+
     "silencia", "mute", "sin sonido", "silenciar",
     "modo silencio", "quita el sonido", "pon en silencio",
     "mutear", "cállate", "callate", "sin audio",
-]
 
-PATRONES_VOL_MAXIMO = [
+)
+
+PATRONES_VOL_MAXIMO = (
+
     "volumen al máximo", "volumen maximo", "al máximo el volumen",
     "sube el volumen al máximo", "volumen al tope",
     "ponlo al máximo", "ponlo al maximo",
-]
+
+)
 
 # ─── Clima ────────────────────────────────────────────────────────
 # Nota: "temperatura" es corto pero el contexto siempre incluye
 # "qué temperatura" o "temperatura en X", así que es seguro.
-PATRONES_CLIMA = [
+PATRONES_CLIMA = (
+
     "clima", "tiempo", "temperatura", "llueve", "va a llover",
     "pronóstico", "pronostico", "lloverá", "llovera",
     "cómo está el tiempo", "como esta el tiempo",
     "qué clima hace", "que clima hace",
     "va a hacer calor", "va a hacer frio", "va a hacer frío",
     "está lloviendo", "esta lloviendo",
-]
 
-PATRONES_CLIMA_PRONOS = [
+)
+
+PATRONES_CLIMA_PRONOS = (
+
     "pronóstico", "pronostico", "mañana", "próximos días",
     "proximos dias", "esta semana", "para mañana",
     "pronóstico del tiempo", "para la semana",
-]
+
+)
 
 # ─── Recordatorios ────────────────────────────────────────────────
-PATRONES_RECORDATORIO_CREAR = [
+PATRONES_RECORDATORIO_CREAR = (
+
     "recuérdame", "recuerdame", "pon un recordatorio",
     "avísame en", "avisame en", "crea un recordatorio",
     "ponme un recordatorio", "acuérdame", "acordame",
     "no me dejes olvidar", "recuérdame que", "recuerdame que",
-]
 
-PATRONES_RECORDATORIO_LISTAR = [
+)
+
+PATRONES_RECORDATORIO_LISTAR = (
+
     "qué recordatorios", "que recordatorios",
     "mis recordatorios", "recordatorios activos",
     "cuántos recordatorios", "cuantos recordatorios",
     "ver recordatorios", "listar recordatorios",
     "qué tengo pendiente", "que tengo pendiente",
-]
 
-PATRONES_RECORDATORIO_CANCELAR = [
+)
+
+PATRONES_RECORDATORIO_CANCELAR = (
+
     "cancela el recordatorio", "cancelar recordatorio",
     "borra el recordatorio", "elimina el recordatorio",
     "quita el recordatorio", "borra el aviso",
-]
+
+)
 
 # ─── Notas ────────────────────────────────────────────────────────
-PATRONES_NOTA_AGREGAR = [
+PATRONES_NOTA_AGREGAR = (
+
     "anota:", "anota ", "toma nota", "guarda nota",
     "añade una nota", "agrega una nota", "escribe una nota",
     "apunta:", "apunta ", "nota rápida", "guarda esto:",
-]
 
-PATRONES_NOTA_LEER = [
+)
+
+PATRONES_NOTA_LEER = (
+
     "muéstrame mis notas", "muéstrame las notas",
     "mis notas", "ver notas", "leer notas",
     "qué notas tengo", "que notas tengo",
     "muestra mis notas", "cuáles son mis notas",
     "cuales son mis notas", "dame mis notas",
-]
 
-PATRONES_NOTA_BORRAR = [
+)
+
+PATRONES_NOTA_BORRAR = (
+
     "borra la última nota", "elimina la nota",
     "borra la nota", "eliminar nota",
     "borra la ultima nota", "quita la última nota",
     "borra mi última nota",
-]
 
-PATRONES_NOTA_BUSCAR = [
+)
+
+PATRONES_NOTA_BUSCAR = (
+
     "busca en mis notas", "buscar en notas",
     "busca en notas", "encuentra en notas",
     "busca mis notas", "filtra mis notas",
-]
+
+)
 
 # ─── WiFi ─────────────────────────────────────────────────────────
-PATRONES_WIFI = [
+PATRONES_WIFI = (
+
     "wifi", "wi-fi", "red inalámbrica", "red inalambrica",
     "internet", "conexión wifi", "conexion wifi",
-]
-PATRONES_WIFI_ACTIVAR = [
+
+)
+PATRONES_WIFI_ACTIVAR = (
+
     "activa", "enciende", "activar", "encender", "conecta el",
     "prende el wifi", "prende", "habilita",
-]
-PATRONES_WIFI_DESACT = [
+
+)
+PATRONES_WIFI_DESACT = (
+
     "desactiva", "apaga", "desactivar", "apagar",
     "deshabilita", "corta el wifi", "desconecta el wifi",
-]
-PATRONES_WIFI_LISTAR = [
+
+)
+PATRONES_WIFI_LISTAR = (
+
     "listar", "redes", "qué redes", "que redes",
     "ver redes", "cuáles redes", "cuales redes",
     "redes disponibles", "busca redes",
-]
+
+)
 
 # ─── Bluetooth ────────────────────────────────────────────────────
-PATRONES_BLUETOOTH = ["bluetooth", "bluet"]
-PATRONES_BT_ACTIVAR = ["activa", "enciende", "activar", "encender", "habilita"]
-PATRONES_BT_DESACT  = ["desactiva", "apaga", "desactivar", "apagar", "deshabilita"]
-PATRONES_BT_ABRIR   = ["abre", "abrir", "gestor", "configuración", "configuracion"]
+PATRONES_BLUETOOTH = ("bluetooth", "bluet")
+PATRONES_BT_ACTIVAR = ("activa", "enciende", "activar", "encender", "habilita")
+PATRONES_BT_DESACT = ("desactiva", "apaga", "desactivar", "apagar", "deshabilita")
+PATRONES_BT_ABRIR = ("abre", "abrir", "gestor", "configuración", "configuracion")
 
 # ─── Energía ──────────────────────────────────────────────────────
-PATRONES_SUSPENDER = [
+PATRONES_SUSPENDER = (
+
     "suspende", "suspender", "hiberna", "hibernar",
     "pon en suspensión", "modo suspensión",
-]
-PATRONES_APAGAR = [
+
+)
+PATRONES_APAGAR = (
+
     "apaga el equipo", "apagar el equipo", "apaga el pc",
     "apaga el computador", "apaga la computadora",
     "apaga el sistema", "apagar el sistema",
     "apaga la máquina", "apaga la maquina",
-]
-PATRONES_REINICIAR = [
+
+)
+PATRONES_REINICIAR = (
+
     "reinicia el equipo", "reiniciar el equipo", "reinicia el pc",
     "reinicia el computador", "reinicia el sistema",
     "reiniciar", "reboot", "reinicia la máquina",
-]
+
+)
 
 # ─── Búsqueda web ─────────────────────────────────────────────────
-PATRONES_BUSCAR_GOOGLE = [
+PATRONES_BUSCAR_GOOGLE = (
+
     "busca en google", "buscar en google", "googlea",
     "busca google", "búscame en google", "buscame en google",
     "abre google y busca",
-]
-PATRONES_BUSCAR_YOUTUBE = [
+
+)
+PATRONES_BUSCAR_YOUTUBE = (
+
     "busca en youtube", "buscar en youtube", "busca en you tube",
     "pon en youtube", "busca youtube", "búscame en youtube",
     "buscame en youtube", "busca un video de",
-]
-PATRONES_BUSCAR_WIKI = [
+
+)
+PATRONES_BUSCAR_WIKI = (
+
     "busca en wikipedia", "buscar en wikipedia",
     "qué es según wikipedia", "que es segun wikipedia",
     "wikipedia sobre",
-]
+
+)
 
 # ─── IA y modelos ─────────────────────────────────────────────────
-PATRONES_IA_ESTADO = [
+PATRONES_IA_ESTADO = (
+
     "qué ia", "que ia", "estado de las ia", "ias disponibles",
     "qué ia estás usando", "que ia estas usando",
     "qué inteligencia", "que inteligencia",
     "estado de la ia", "qué ia tengo activa",
-]
-PATRONES_TOKENS = [
+
+)
+PATRONES_TOKENS = (
+
     "tokens usados", "cuántos tokens", "cuantos tokens",
     "uso de tokens", "reporte de tokens", "consumo de tokens",
     "cuánto he gastado", "cuanto he gastado",
-]
-PATRONES_CAMBIAR_IA = [
+
+)
+PATRONES_CAMBIAR_IA = (
+
     "cambia a ", "cambia la ia a ", "activa ia ",
     "usa la ia ", "cambia la inteligencia a ",
     "quiero usar ", "activa ",
-]
-PATRONES_MODELO_OLL = [
+
+)
+PATRONES_MODELO_OLL = (
+
     "cambia el modelo a ", "cambia el modelo ollama a ",
     "usa el modelo ", "usa ollama ", "cambia modelo a ",
-]
-PATRONES_MODELOS_LIST = [
+
+)
+PATRONES_MODELOS_LIST = (
+
     "qué modelos hay", "que modelos hay",
     "modelos disponibles", "listar modelos",
     "qué modelos tienes", "que modelos tienes",
     "qué modelos de ollama", "que modelos de ollama",
-]
+
+)
 
 # ─── WhatsApp ─────────────────────────────────────────────────────
-PATRONES_WA_ABRIR  = ["abre whatsapp", "abrir whatsapp", "ejecuta whatsapp"]
-PATRONES_WA_ESTADO = ["estado whatsapp", "whatsapp conectado"]
-PATRONES_WA_CERRAR = ["cierra whatsapp", "cerrar whatsapp"]
+PATRONES_WA_ABRIR = ("abre whatsapp", "abrir whatsapp", "ejecuta whatsapp")
+PATRONES_WA_ESTADO = ("estado whatsapp", "whatsapp conectado")
+PATRONES_WA_CERRAR = ("cierra whatsapp", "cerrar whatsapp")
 
 # ─── Funcionalidades (ayuda por voz) ──────────────────────────────
-PATRONES_FUNCIONES_TODAS = [
+PATRONES_FUNCIONES_TODAS = (
+
     "funcionalidades totales", "todas las funcionalidades",
     "qué puedes hacer todo", "ayuda completa",
     "funciones totales", "todo lo que puedes hacer",
     "dame todo", "dime todo lo que sabes hacer",
-]
-PATRONES_FUNCIONES_GRUPOS = [
+
+)
+PATRONES_FUNCIONES_GRUPOS = (
+
     "funcionalidades por grupos", "grupos de funciones",
     "qué grupos hay", "funciones por grupos",
     "qué categorías tienes", "que categorias tienes",
     "qué puedes hacer", "que puedes hacer",
     "ayuda", "ayúdame", "ayudame",
-]
+
+)
 
 # ════════════════════════════════════════════════════════════════════
 # GRUPOS DE FUNCIONALIDADES

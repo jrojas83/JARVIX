@@ -37,6 +37,7 @@ _COLORES_FUENTE = {
     "cache":      AZUL,
     "patron":     GRIS,   # respuesta por patrón directo (sin IA)
     "plugin":     VERDE,
+    "conversacion": BLANCO,  # conversación proactiva
 }
 
 
@@ -118,7 +119,7 @@ def imprimir_estado(mensaje: str, tipo: str = "info"):
 
 
 def imprimir_banner(version: str = "7", modo: str = "texto",
-                    ia_online: bool = False, nombre_usuario: str = ""):
+                    ia_local: bool = False, nombre_usuario: str = ""):
     """Banner de inicio personalizado."""
     saludo = f" — Hola, {nombre_usuario}" if nombre_usuario else ""
     print(f"\n{BOLD}{'═'*52}")
@@ -130,6 +131,6 @@ def imprimir_banner(version: str = "7", modo: str = "texto",
         "espera": "ESPERA (di 'jarvis' para activar)",
     }.get(modo, modo.upper())
     print(f"  Modo: {modo_str}")
-    ia_str = f"{VERDE}✅ activa{RESET}" if ia_online else f"{GRIS}⚪ no configurada{RESET}"
-    print(f"  IA online: {ia_str}")
+    ia_str = f"{VERDE}✅ activa{RESET}" if ia_local else f"{GRIS}⚪ no configurada{RESET}"
+    print(f"  IA local (Ollama): {ia_str}")
     print(f"  {DIM}'test' para diagnóstico · 'ayuda' para comandos{RESET}\n")
