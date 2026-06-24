@@ -25,7 +25,17 @@ from consola import (
     cronometro, imprimir_orden, imprimir_respuesta,
     imprimir_estado, imprimir_banner,
 )
-import requests
+
+# Lazy loading: requests solo se importa cuando se usa
+_requests_module = None
+
+def _get_requests():
+    """Importa requests bajo demanda (lazy loading)."""
+    global _requests_module
+    if _requests_module is None:
+        import requests
+        _requests_module = requests
+    return _requests_module
 
 from acciones import (
     abrir_app, abrir_carpeta_conocida, abrir_archivo_conocido,

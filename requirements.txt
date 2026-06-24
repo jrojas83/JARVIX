@@ -1,4 +1,4 @@
-# Jarvis v7 — Dependencias Python
+# Jarvis v8 — Dependencias Python
 # Instalar con: pip install -r requirements.txt
 # (el instalador instalar.sh hace esto automáticamente en un venv)
 
@@ -13,10 +13,12 @@ google-generativeai>=0.5.0   # SDK legacy (funcional, deprecation warning)
 google-genai>=1.0.0          # SDK nuevo recomendado (silencia FutureWarning)
 anthropic>=0.20.0
 
-# ── Voz ───────────────────────────────────────────────────────
-SpeechRecognition>=3.10.0
+# ── Voz (OFFLINE) ─────────────────────────────────────────────
+# faster-whisper reemplaza SpeechRecognition + PyAudio
+# Reconocimiento de voz offline de alta precisión en español
+faster-whisper>=1.0.0
 pyttsx3>=2.90
-pyaudio>=0.2.13
+# sox: herramienta de línea de comandos para grabación (instalar con apt-get install sox)
 
 # ── Automatización ────────────────────────────────────────────
 selenium>=4.18.0
@@ -28,7 +30,7 @@ psutil>=5.9.0
 # ── Base de datos ─────────────────────────────────────────────
 # sqlite3 ya viene incluido en Python estándar — no necesita instalación
 
-# ── v7: Nuevas funcionalidades ────────────────────────────────
+# ── v8: Mejoras de rendimiento ────────────────────────────────
 # NOTA: cache.py, consola.py, diagnostico.py y plugins/ NO requieren
 # nuevas dependencias — usan solo stdlib + paquetes ya listados arriba.
 #

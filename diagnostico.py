@@ -145,14 +145,13 @@ def check_espeak() -> tuple[bool, str]:
 
 def check_microfono() -> tuple[bool, str]:
     try:
-        import speech_recognition as sr
-        r = sr.Recognizer()
-        mics = sr.Microphone.list_microphone_names()
-        if not mics:
-            return False, "No se detectaron micrófonos"
-        return True, f"{len(mics)} micrófono(s): {mics[0][:40]}"
+        # Verificar faster-whisper (nuevo sistema de voz offline)
+        from faster_whisper import WhisperModel
+        # Carga rápida para verificar disponibilidad
+        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        return True, "faster-whisper disponible (offline)"
     except ImportError:
-        return False, "speech_recognition no instalado: pip install SpeechRecognition"
+        return False, "faster-whisper no instalado: pip install faster-whisper"
     except Exception as e:
         return False, str(e)
 

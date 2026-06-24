@@ -1,10 +1,25 @@
 # voz.py — Jarvis v8
 # Sistema de voz mejorado con soporte para múltiples motores TTS
-import speech_recognition as sr
-import subprocess
-import sys
-import random
-from config import IDIOMA_VOZ, PALABRA_ACTIVACION, TIMEOUT_ESCUCHA
+# Reconocimiento de voz offline con faster-whisper (reemplaza SpeechRecognition + PyAudio)
+
+# Lazy loading: faster_whisper solo se importa cuando se usa
+_whisper_model = None
+
+def _get_whisper_model(modelo="base"):
+    """
+    Carga el modelo Whisper bajo demanda (lazy loading).
+    Modelos disponibles: tiny, base, small, medium, large-v2, large-v3
+    - tiny/base: rápidos, menos precisos
+    - small/medium: equilibrio velocidad/precisión
+    - large: máxima precisión, más lento
+    """
+    global _whisper_model
+    if _whisper_model is None:
+        from faster_whisper import WhisperModel
+        # Usar CPU por defecto para compatibilidad universal
+        # Si tienes GPU NVIDIA, cambiar a "cuda" para mayor velocidad
+        _whisper_model = WhisperModel(modelo, device="cpu", compute_type="int8")
+    return _whisper_model
 
 # Configuración de voz mejorada
 CONFIGURACION_VOS = {
@@ -33,48 +48,109 @@ FRASES_TRANSICION = [
 def escuchar(timeout=None):
     """
     Escucha el micrófono y devuelve texto en minúsculas.
+    Usa faster-whisper para reconocimiento offline de alta precisión.
     Devuelve cadena vacía si no escucha nada o hay error.
     """
+    import subprocess
+    import tempfile
+    import os
+    from config import IDIOMA_VOZ, TIMEOUT_ESCUCHA
+    
+    model = _get_whisper_model("base")
+    
     if timeout is None:
         timeout = TIMEOUT_ESCUCHA
 
-    r = sr.Recognizer()
-    r.pause_threshold = 1.0
-    r.energy_threshold = 300
-
+    # Grabar audio con sox (más eficiente que PyAudio)
     try:
-        with sr.Microphone() as source:
-            print("🎤 Escuchando...")
-            r.adjust_for_ambient_noise(source, duration=0.5)
-            audio = r.listen(source, timeout=timeout, phrase_time_limit=12)
-
-        texto = r.recognize_google(audio, language=IDIOMA_VOZ)
-        print(f"   Dijiste: {texto}")
-        return texto.lower()
-
-    except sr.WaitTimeoutError:
-        return ""
-    except sr.UnknownValueError:
-        return ""
-    except sr.RequestError as e:
-        print(f"   Error de reconocimiento: {e}")
+        print("🎤 Escuchando...")
+        
+        # Crear archivo temporal para guardar el audio
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            temp_audio = f.name
+        
+        # Grabar audio del micrófono usando sox
+        # -d: dispositivo default, -c 1: mono, -r 16000: sample rate para Whisper
+        grabacion = subprocess.run(
+            ["rec", "-c", "1", "-r", "16000", temp_audio],
+            input=b"",
+            capture_output=True,
+            timeout=timeout
+        )
+        
+        # Transcribir con Whisper
+        segments, info = model.transcribe(temp_audio, language="es")
+        texto = " ".join([segment.text for segment in segments]).strip()
+        
+        # Limpiar archivo temporal
+        os.unlink(temp_audio)
+        
+        if texto:
+            print(f"   Dijiste: {texto}")
+            return texto.lower()
+        else:
+            return ""
+            
+    except subprocess.TimeoutExpired:
+        # Limpiar archivo temporal si existe
+        if 'temp_audio' in locals() and os.path.exists(temp_audio):
+            os.unlink(temp_audio)
         return ""
     except Exception as e:
+        # Limpiar archivo temporal si existe
+        if 'temp_audio' in locals() and os.path.exists(temp_audio):
+            os.unlink(temp_audio)
         print(f"   Error de voz: {e}")
         return ""
+
+
+def detectar_palabra_activacion(palabra_activacion, model):
+    """
+    Detecta si una grabación contiene la palabra de activación.
+    Usa Whisper para transcripción offline.
+    """
+    import tempfile
+    import subprocess
+    import os
+    
+    try:
+        # Crear archivo temporal
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            temp_audio = f.name
+        
+        # Grabar audio corto (3 segundos)
+        subprocess.run(
+            ["rec", "-c", "1", "-r", "16000", temp_audio],
+            input=b"",
+            capture_output=True,
+            timeout=3
+        )
+        
+        # Transcribir
+        segments, info = model.transcribe(temp_audio, language="es")
+        texto = " ".join([segment.text for segment in segments]).strip().lower()
+        
+        # Limpiar
+        os.unlink(temp_audio)
+        
+        return palabra_activacion in texto, texto
+        
+    except Exception:
+        if 'temp_audio' in locals() and os.path.exists(temp_audio):
+            os.unlink(temp_audio)
+        return False, ""
 
 
 def escuchar_con_activacion():
     """
     Modo espera robusto: escucha indefinidamente hasta detectar la palabra de
-    activación. Si el micrófono falla, reintenta con backoff exponencial.
-    Jamás cae silenciosamente: siempre muestra qué está pasando.
+    activación usando Whisper offline. Si el micrófono falla, reintenta con 
+    backoff exponencial. Jamás cae silenciosamente: siempre muestra qué está pasando.
     """
     import time
-
-    r = sr.Recognizer()
-    r.pause_threshold = 0.8
-    r.energy_threshold = 300
+    from config import PALABRA_ACTIVACION
+    
+    model = _get_whisper_model("tiny")  # tiny es más rápido para detección continua
 
     intentos_error = 0
     MAX_BACKOFF    = 30   # segundos máximos de espera entre reintentos
@@ -83,35 +159,21 @@ def escuchar_con_activacion():
 
     while True:
         try:
-            with sr.Microphone() as source:
-                intentos_error = 0  # Micrófono accesible → resetear backoff
-                r.adjust_for_ambient_noise(source, duration=0.3)
-                audio = r.listen(source, timeout=3, phrase_time_limit=5)
+            # Detectar palabra de activación
+            detectado, texto = detectar_palabra_activacion(PALABRA_ACTIVACION, model)
 
-            texto = r.recognize_google(audio, language=IDIOMA_VOZ).lower()
-
-            if PALABRA_ACTIVACION in texto:
+            if detectado:
                 print(f"✅ Activado por '{PALABRA_ACTIVACION}'")
                 hablar("Dime")
-                with sr.Microphone() as source:
-                    r.adjust_for_ambient_noise(source, duration=0.3)
-                    print("🎤 Escuchando orden...")
-                    audio = r.listen(source, timeout=TIMEOUT_ESCUCHA, phrase_time_limit=12)
-                orden = r.recognize_google(audio, language=IDIOMA_VOZ).lower()
-                print(f"   Dijiste: {orden}")
-                return orden
+                
+                # Escuchar orden completa
+                orden = escuchar(timeout=TIMEOUT_ESCUCHA)
+                if orden:
+                    print(f"   Dijiste: {orden}")
+                    return orden
 
-        except (sr.WaitTimeoutError, sr.UnknownValueError):
-            # Normal — silencio o audio no reconocido
-            continue
-
-        except sr.RequestError as e:
-            # Error de red con la API de reconocimiento
-            intentos_error += 1
-            espera = min(2 ** intentos_error, MAX_BACKOFF)
-            print(f"   ⚠️  Error reconocimiento de voz (intento {intentos_error}): {e}")
-            print(f"   Reintentando en {espera}s...")
-            time.sleep(espera)
+        except subprocess.TimeoutExpired:
+            # Normal — timeout de grabación
             continue
 
         except OSError as e:
@@ -121,10 +183,6 @@ def escuchar_con_activacion():
             print(f"   ⚠️  Micrófono no disponible (intento {intentos_error}): {e}")
             print(f"   Reintentando en {espera}s... (reconecta el micro si es necesario)")
             time.sleep(espera)
-            # Reinicializar recognizer por si el dispositivo cambió
-            r = sr.Recognizer()
-            r.pause_threshold = 0.8
-            r.energy_threshold = 300
             continue
 
         except KeyboardInterrupt:
@@ -147,6 +205,8 @@ def hablar(texto, usar_frase_transicion=False):
     - texto: el texto a convertir a voz
     - usar_frase_transicion: si True, añade una frase de transición aleatoria antes del texto
     """
+    import random
+    
     # Opcionalmente añadir frase de transición para sonar más natural
     if usar_frase_transicion and FRASES_TRANSICION:
         frase = random.choice(FRASES_TRANSICION)
