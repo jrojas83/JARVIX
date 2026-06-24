@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 
 from jarvis_core.intents.types import Intent
-from intenciones import (
+from jarvis_core.intents.patterns import (
     PATRONES_HORA,
     PATRONES_FECHA,
     PATRONES_SISTEMA,

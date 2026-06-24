@@ -191,7 +191,7 @@ class JarvisApp:
 
                 o = orden.lower().strip()
                 if o in ("ayuda", "help"):
-                    from intenciones import ayuda_grupos
+                    from jarvis_core.intents.patterns import ayuda_grupos
 
                     print(ayuda_grupos())
                     print("\n  Escribe 'funcionalidades totales' para ver todos los comandos.")

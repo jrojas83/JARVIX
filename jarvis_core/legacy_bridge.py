@@ -35,7 +35,7 @@ from ia_online import (
     reporte_tokens,
 )
 from voz import hablar
-from intenciones import (
+from jarvis_core.intents.patterns import (
     PATRONES_HORA,
     PATRONES_FECHA,
     PATRONES_SISTEMA,

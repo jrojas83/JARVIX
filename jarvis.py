@@ -55,7 +55,7 @@ from ia_online import (
 from recordatorios import init_db, restaurar_recordatorios_pendientes
 from voz import escuchar, escuchar_con_activacion, hablar
 from plugins import cargar_plugins, ejecutar_por_orden, resumen_plugins
-from intenciones import (
+from jarvis_core.intents.patterns import (
     PATRONES_HORA, PATRONES_FECHA, PATRONES_SISTEMA, PATRONES_SALIR,
     PATRONES_VOL_SUBIR, PATRONES_VOL_BAJAR, PATRONES_VOL_SILENCIO, PATRONES_VOL_MAXIMO,
     PATRONES_CLIMA, PATRONES_CLIMA_PRONOS,
@@ -550,7 +550,7 @@ def main():
 
             # ── Comandos especiales de consola ────────────────
             if orden.lower() in ("ayuda", "help"):
-                from intenciones import ayuda_grupos
+                from jarvis_core.intents.patterns import ayuda_grupos
                 print(ayuda_grupos())
                 print("\n  Escribe 'funcionalidades totales' para ver todos los comandos.")
                 continue
