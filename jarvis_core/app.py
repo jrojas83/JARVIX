@@ -20,11 +20,6 @@ from config import (
     saludo_contextual,
     URL_OLLAMA,
     MODELO,
-    GROQ_API_KEY,
-    GEMINI_API_KEY,
-    ANTHROPIC_API_KEY,
-    MODELO_ONLINE,
-    IA_PREFERIDA,
 )
 from voz import hablar, escuchar, escuchar_con_activacion
 
@@ -39,6 +34,58 @@ from jarvis_core.agent.runner import AgentRunner
 
 from jarvis_core.legacy_bridge import ejecutar as ejecutar_sync
 from jarvis_core.legacy_bridge import procesar_sin_ia as procesar_sin_ia_legacy
+from jarvis_core.conversation import ConversationEngine, cola_conversacion
+
+
+def _escanear_modelos_ollama() -> list[str]:
+    """Escanea modelos de Ollama instalados localmente."""
+    import requests
+    
+    try:
+        r = requests.get("http://localhost:11434/api/tags", timeout=3)
+        if r.status_code == 200:
+            data = r.json()
+            modelos = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+            return modelos
+    except Exception:
+        pass
+    return []
+
+
+def _seleccionar_modelo_interactivo(modelos: list[str], modelo_default: str) -> str:
+    """Permite al usuario seleccionar un modelo de la lista."""
+    if not modelos:
+        print(f"\n  {imprimir_estado('No se encontraron modelos de Ollama instalados.', 'warn')}")
+        print(f"  {imprimir_estado('Instala uno con: ollama pull qwen2.5:3b', 'info')}")
+        return modelo_default
+    
+    print(f"\n{'='*52}")
+    print(f"  🤖 Modelos de Ollama disponibles ({len(modelos)}):")
+    print(f"{'='*52}")
+    
+    for i, modelo in enumerate(modelos, 1):
+        marca = "✓" if modelo == modelo_default else " "
+        print(f"  [{marca}] {i}. {modelo}")
+    
+    print(f"\n  Modelo por defecto: {modelo_default}")
+    print(f"  Escribe el número del modelo a usar, o Enter para continuar con el default.")
+    
+    try:
+        seleccion = input("\n  Tu elección: ").strip()
+        if not seleccion:
+            return modelo_default
+        
+        idx = int(seleccion) - 1
+        if 0 <= idx < len(modelos):
+            modelo_elegido = modelos[idx]
+            print(f"  {imprimir_estado(f'Usando modelo: {modelo_elegido}', 'ok')}")
+            return modelo_elegido
+        else:
+            print(f"  {imprimir_estado('Selección inválida, usando modelo por defecto.', 'warn')}")
+            return modelo_default
+    except (ValueError, EOFError, KeyboardInterrupt):
+        print(f"\n  {imprimir_estado('Usando modelo por defecto.', 'info')}")
+        return modelo_default
 
 
 MEMORIA_FILE = "memoria.json"
@@ -68,7 +115,7 @@ class AppConfig:
 
 
 class JarvisApp:
-    def __init__(self, cfg: AppConfig) -> None:
+    def __init__(self, cfg: AppConfig, modelo_ollama: str = MODELO) -> None:
         self.cfg = cfg
         self.plugins = PluginCompat()
         self.registry = IntentRegistry()
@@ -78,14 +125,16 @@ class JarvisApp:
         self.bus = EventBus()
         self.memory = MemoryStore()
         self.ai = AiOrchestrator(
-            groq_api_key=GROQ_API_KEY,
-            gemini_api_key=GEMINI_API_KEY,
-            anthropic_api_key=ANTHROPIC_API_KEY,
-            anthropic_model=MODELO_ONLINE or "claude-haiku-4-5-20251001",
             ollama_url=URL_OLLAMA,
-            ollama_model=MODELO,
+            ollama_model=modelo_ollama,
         )
         self.agent = AgentRunner(self.ai)
+        # Motor de conversación proactiva
+        self.conversation = ConversationEngine(
+            inactividad_min=30,  # Inicia conversación después de 30 min de inactividad
+            check_seg=60,        # Revisa cada minuto
+            max_conversaciones_dia=5  # Máximo 5 conversaciones por día
+        )
 
     async def _get_order(self) -> str:
         if self.cfg.mode == "espera":
@@ -104,8 +153,11 @@ class JarvisApp:
         self.plugins.load()
 
         await self.bus.start(workers=2)
+        
+        # Iniciar motor de conversación proactiva
+        self.conversation.start()
 
-        imprimir_banner(version="8", modo=self.cfg.mode, ia_online=True, nombre_usuario=NOMBRE_USUARIO)
+        imprimir_banner(version="8", modo=self.cfg.mode, ia_local=True, nombre_usuario=NOMBRE_USUARIO)
         saludo = saludo_contextual()
         await asyncio.to_thread(hablar, saludo)
 
@@ -122,9 +174,20 @@ class JarvisApp:
 
         while True:
             try:
+                # Verificar mensajes de conversación proactiva
+                while not cola_conversacion.empty():
+                    msg_conv = cola_conversacion.get_nowait()
+                    if msg_conv:
+                        imprimir_respuesta(msg_conv, fuente="conversacion")
+                        await asyncio.to_thread(hablar, msg_conv, usar_frase_transicion=False)
+                        self.conversation.registrar_respuesta_jarvis(msg_conv)
+
                 orden = await self._get_order()
                 if not orden:
                     continue
+
+                # Registrar interacción del usuario para el motor de conversación
+                self.conversation.registrar_interaccion(orden)
 
                 o = orden.lower().strip()
                 if o in ("ayuda", "help"):
@@ -223,9 +286,9 @@ class JarvisApp:
                         _guardar_memoria(historial)
                     continue
 
-                # 4) IA online/local en paralelo (first-wins)
+                # 4) IA local (Ollama)
                 with cronometro("ai") as c:
-                    resp = await self.ai.ask(orden, historial, mode=IA_PREFERIDA or "auto")
+                    resp = await self.ai.ask(orden, historial, mode="ollama")
 
                 if resp and resp.text:
                     imprimir_respuesta(resp.text, fuente=resp.provider, ms=c.ms)
@@ -233,6 +296,8 @@ class JarvisApp:
                     historial.append({"role": "assistant", "content": resp.text})
                     _guardar_memoria(historial)
                     cache.set(orden, resp.text, ttl=TTL_IA)
+                    # Registrar respuesta en el motor de conversación
+                    self.conversation.registrar_respuesta_jarvis(resp.text)
                     continue
 
                 imprimir_estado("No pude obtener respuesta de ninguna IA.", "warn")
@@ -254,7 +319,13 @@ async def run_app_from_argv(argv: list[str]) -> None:
         mode = "voz"
     if "--espera" in argv:
         mode = "espera"
-    app = JarvisApp(AppConfig(mode=mode))
+    
+    # Escanear modelos de Ollama disponibles y permitir selección
+    print(f"\n{imprimir_estado('Escaneando modelos de Ollama...', 'info')}")
+    modelos_disponibles = _escanear_modelos_ollama()
+    modelo_seleccionado = _seleccionar_modelo_interactivo(modelos_disponibles, MODELO)
+    
+    app = JarvisApp(AppConfig(mode=mode), modelo_ollama=modelo_seleccionado)
     await app.run()
 
 

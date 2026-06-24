@@ -175,6 +175,15 @@ Carpetas: {carpetas_lista}
 
 # ─── Procesamiento sin IA (modo rápido con patrones) ──────────
 
+# Optimización: precompilar tuplas de búsqueda para operaciones frecuentes
+_PATRONES_WHATSAPP_ESTADO = ("estado whatsapp", "whatsapp conectado")
+_PATRONES_WHATSAPP_CERRAR = ("cierra whatsapp", "cerrar whatsapp")
+_PATRONES_WHATSAPP_ABRIR = ("abre ", "abrir ", "ejecuta ")
+_PATRONES_LISTAR = ("qué hay en", "lista", "mostrar archivos")
+_PATRONES_APP_ACCION = ("abre", "abrir", "ejecuta")
+_PATRONES_CARPETA_ACCION = ("abre", "muestra", "carpeta", "abrir")
+
+
 def procesar_sin_ia(orden):
     """
     Detecta intenciones comunes directamente con patrones.
@@ -203,7 +212,7 @@ def procesar_sin_ia(orden):
             "contacto":  m_leer.group(1).strip().title()
         }}
 
-    if "whatsapp" in o and any(p in o for p in ["recuérdame", "recuerdame", "recordatorio"]):
+    if "whatsapp" in o and any(p in o for p in ("recuérdame", "recuerdame", "recordatorio")):
         m_wa = re.search(r'en\s+([\d\w\s]+?)\s+(?:a|para)\s+([^\s:]+)(?::\s*(.+))?', o)
         if m_wa:
             return {"accion": "whatsapp", "parametros": {
@@ -213,11 +222,11 @@ def procesar_sin_ia(orden):
                 "tiempo":    m_wa.group(1).strip(),
             }}
 
-    if any(p in o for p in ["estado whatsapp", "whatsapp conectado"]):
+    if any(p in o for p in _PATRONES_WHATSAPP_ESTADO):
         return {"accion": "whatsapp", "parametros": {"operacion": "estado"}}
-    if any(p in o for p in ["cierra whatsapp", "cerrar whatsapp"]):
+    if any(p in o for p in _PATRONES_WHATSAPP_CERRAR):
         return {"accion": "whatsapp", "parametros": {"operacion": "cerrar"}}
-    if "whatsapp" in o and any(p in o for p in ["abre ", "abrir ", "ejecuta "]):
+    if "whatsapp" in o and any(p in o for p in _PATRONES_WHATSAPP_ABRIR):
         return {"accion": "whatsapp", "parametros": {"operacion": "abrir"}}
 
     # ── Funcionalidades por voz ────────────────────────────────

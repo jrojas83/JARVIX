@@ -1,8 +1,34 @@
-# voz.py — Jarvis v2
+# voz.py — Jarvis v8
+# Sistema de voz mejorado con soporte para múltiples motores TTS
 import speech_recognition as sr
 import subprocess
 import sys
+import random
 from config import IDIOMA_VOZ, PALABRA_ACTIVACION, TIMEOUT_ESCUCHA
+
+# Configuración de voz mejorada
+CONFIGURACION_VOS = {
+    "espeak": {
+        "voz": "es+m3",
+        "velocidad": 150,  # ligeramente más rápido para sonar más natural
+        "volumen": 160,    # más alto para mejor claridad
+        "pitch": 50,       # tono medio
+    },
+    "pyttsx3": {
+        "rate": 160,       # velocidad optimizada
+        "volume": 0.9,     # volumen alto pero no máximo
+    }
+}
+
+# Frases de transición para hacer la conversación más natural
+FRASES_TRANSICION = [
+    "¡Claro!", 
+    "Entendido", 
+    "Perfecto", 
+    "De acuerdo",
+    "Vale",
+    "Ahí vamos",
+]
 
 def escuchar(timeout=None):
     """
@@ -112,14 +138,27 @@ def escuchar_con_activacion():
             continue
 
 
-def hablar(texto):
+def hablar(texto, usar_frase_transicion=False):
     """
-    Convierte texto a voz. Intenta espeak primero, luego pyttsx3 si falla.
+    Convierte texto a voz con configuración mejorada.
+    Intenta espeak primero (más rápido), luego pyttsx3 si falla.
+    
+    Parámetros:
+    - texto: el texto a convertir a voz
+    - usar_frase_transicion: si True, añade una frase de transición aleatoria antes del texto
     """
+    # Opcionalmente añadir frase de transición para sonar más natural
+    if usar_frase_transicion and FRASES_TRANSICION:
+        frase = random.choice(FRASES_TRANSICION)
+        texto = f"{frase}. {texto}"
+    
     print(f"🔊 Jarvis: {texto}")
+    
+    cfg = CONFIGURACION_VOS["espeak"]
     try:
         subprocess.run(
-            ["espeak", "-v", "es+m3", "-s", "140", "-a", "150", texto],
+            ["espeak", "-v", cfg["voz"], "-s", str(cfg["velocidad"]), 
+             "-a", str(cfg["volumen"]), "--pitch=", str(cfg["pitch"]), texto],
             capture_output=True,
             timeout=10
         )
@@ -128,7 +167,9 @@ def hablar(texto):
         try:
             import pyttsx3
             engine = pyttsx3.init()
-            engine.setProperty("rate", 150)
+            cfg_py = CONFIGURACION_VOS["pyttsx3"]
+            engine.setProperty("rate", cfg_py["rate"])
+            engine.setProperty("volume", cfg_py["volume"])
             voices = engine.getProperty("voices")
             # Buscar voz en español
             for v in voices:
@@ -143,3 +184,36 @@ def hablar(texto):
         print("   (TTS tardó demasiado, continuando...)")
     except Exception as e:
         print(f"   Error TTS: {e}")
+
+
+def hablar_con_emocion(texto, emocion="neutral"):
+    """
+    Versión mejorada de hablar que ajusta parámetros según la emoción.
+    
+    Emociones soportadas:
+    - neutral: configuración normal
+    - alegre: más rápido y tono más alto
+    - serio: más lento y tono más bajo
+    - urgente: muy rápido y volumen alto
+    """
+    emociones = {
+        "neutral": {"rate": 150, "pitch": 50, "volume": 160},
+        "alegre": {"rate": 170, "pitch": 60, "volume": 170},
+        "serio": {"rate": 130, "pitch": 40, "volume": 150},
+        "urgente": {"rate": 180, "pitch": 55, "volume": 200},
+    }
+    
+    cfg = emociones.get(emocion, emociones["neutral"])
+    print(f"🔊 Jarvis [{emocion}]: {texto}")
+    
+    try:
+        subprocess.run(
+            ["espeak", "-v", CONFIGURACION_VOS["espeak"]["voz"], 
+             "-s", str(cfg["rate"]), "-a", str(cfg["volume"]), 
+             f"--pitch={cfg['pitch']}", texto],
+            capture_output=True,
+            timeout=10
+        )
+    except Exception as e:
+        # Fallback simplificado
+        hablar(texto)

@@ -13,6 +13,7 @@ import hashlib
 import time
 from datetime import datetime
 from logger import log
+from functools import lru_cache
 
 # TTL en segundos según tipo de consulta
 TTL_CLIMA    = 300   # 5 minutos  — el clima cambia lento
@@ -21,20 +22,24 @@ TTL_IA       = 300   # 5 minutos  — respuestas de conversación
 TTL_DEFAULT  = 300
 
 
+@lru_cache(maxsize=4096)
 def _normalizar(texto: str) -> str:
     """Normaliza orden para que variaciones triviales den la misma clave."""
     return texto.lower().strip().rstrip("?¿.,")
 
 
+@lru_cache(maxsize=4096)
 def _clave(texto: str) -> str:
+    """Genera clave MD5 cacheada para textos normalizados."""
     return hashlib.md5(_normalizar(texto).encode()).hexdigest()
 
 
 class Cache:
-    def __init__(self):
+    def __init__(self, max_size: int = 1000):
         self._store: dict[str, tuple[float, object]] = {}
         self._hits   = 0
         self._misses = 0
+        self._max_size = max_size
 
     def get(self, orden: str, ttl: int = TTL_DEFAULT):
         """
@@ -59,6 +64,12 @@ class Cache:
     def set(self, orden: str, valor: object, ttl: int = TTL_DEFAULT):
         """Guarda una respuesta en caché. ttl solo se usa al leer."""
         key = _clave(orden)
+        # Evitar crecimiento ilimitado: eliminar entradas más antiguas si excede max_size
+        if len(self._store) >= self._max_size:
+            # Eliminar 10% de las entradas más antiguas
+            items_ordenados = sorted(self._store.items(), key=lambda x: x[1][0])
+            for k, _ in items_ordenados[:max(1, self._max_size // 10)]:
+                del self._store[k]
         self._store[key] = (time.monotonic(), valor)
         log.debug("Cache SET: %s", orden[:50])
 
@@ -71,6 +82,9 @@ class Cache:
         """Vacía todo el caché."""
         n = len(self._store)
         self._store.clear()
+        # Limpiar también el caché de lru_cache
+        _normalizar.cache_clear()
+        _clave.cache_clear()
         log.info("Caché vaciado (%d entradas eliminadas)", n)
 
     def stats(self) -> str:
