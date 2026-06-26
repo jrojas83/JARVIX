@@ -456,3 +456,30 @@ def ayuda_total() -> str:
         for cmd in g["comandos"]:
             lineas.append(f"  {cmd}")
     return "\n".join(lineas)
+
+
+# ─── Memoria episódica ────────────────────────────────────────
+PATRONES_MEMORIA_HOY = [
+    "qué hice hoy",
+    "qué hice esta mañana",
+    "resumen de hoy",
+    "qué hice durante el día",
+    "actividad de hoy",
+    "qué hice",
+]
+
+PATRONES_MEMORIA_AYER = [
+    "qué hice ayer",
+    "resumen de ayer",
+    "qué hice el día de ayer",
+    "actividad de ayer",
+]
+
+PATRONES_ULTIMA_VEZ = [
+    "cuándo usé",
+    "cuándo abrí",
+    "última vez que usé",
+    "cuándo fue la última vez",
+    "cuándo ejecuté",
+]
+

@@ -335,6 +335,11 @@ def ejecutar(decision: dict) -> str:
         "tokens": lambda: reporte_tokens(),
         "modelo_ollama": lambda: cambiar_modelo_ollama(params.get("modelo", "").strip() or None),
         "funcionalidades": lambda: accion_funcionalidades(params.get("tipo", "grupos"), params.get("grupo")),
+        # Memoria episódica
+        "que_hice_hoy": lambda: _que_hice_hoy_wrapper(),
+        "que_hice_ayer": lambda: _que_hice_ayer_wrapper(),
+        "resumen_del_dia": lambda: _resumen_del_dia_wrapper(),
+        "ultima_vez_app": lambda: _ultima_vez_app_wrapper(params.get("orden", "")),
     }
 
     if accion == "energia":
@@ -349,4 +354,23 @@ def ejecutar(decision: dict) -> str:
         return fn()
     log.warning("Acción no reconocida: %s", accion)
     return "No sé cómo hacer eso aún"
+
+
+# ─── Wrappers para memoria episódica ──────────────────────────────
+def _que_hice_hoy_wrapper() -> str:
+    from acciones import que_hice_hoy as _fn
+    return _fn()
+
+def _que_hice_ayer_wrapper() -> str:
+    from acciones import que_hice_ayer as _fn
+    return _fn()
+
+def _resumen_del_dia_wrapper() -> str:
+    from acciones import resumen_del_dia as _fn
+    return _fn()
+
+def _ultima_vez_app_wrapper(orden: str) -> str:
+    from acciones import ultima_vez_app as _fn
+    return _fn(orden)
+
 

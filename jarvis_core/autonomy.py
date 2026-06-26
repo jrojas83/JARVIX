@@ -164,6 +164,11 @@ class AutonomyEngine:
             self._disparadas = {k for k in self._disparadas if k[-12:-4] >= ayer}
 
             log.info("[AUTONOMY] Rutina disparada: %s", r["id"])
+            
+            # Registrar evento en memoria episódica
+            from jarvis_core import episodic_memory as em
+            em.registrar("rutina_disparada", descripcion=r.get('id', ''))
+            
             self._emitir(r.get("mensaje", r["desc"]))
 
     def _check_inactividad(self):

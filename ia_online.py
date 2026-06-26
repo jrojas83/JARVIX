@@ -522,18 +522,18 @@ def generar_codigo(peticion, lenguaje=None, pegar_vscode=True):
 
     if not codigo:
         from config import MODELO, URL_OLLAMA
-        requests = _get_requests()
+        requests_lib = _get_requests()
         log.info("Generando código con Ollama (%s) — puede tardar hasta 2 min", MODELO)
         try:
-            r      = requests.post(URL_OLLAMA, json={"model": MODELO, "prompt": prompt, "stream": False}, timeout=120)
+            r      = requests_lib.post(URL_OLLAMA, json={"model": MODELO, "prompt": prompt, "stream": False}, timeout=120)
             codigo = r.json().get("response", "").strip()
-        except requests.exceptions.Timeout:
-            log.error("Ollama timeout en generación de código (>120s). Modelo: %s", MODELO)
-            return "Ollama tardó demasiado. Prueba: 'cambia el modelo a qwen2.5:1.5b'"
-        except requests.exceptions.ConnectionError:
-            log.error("No se puede conectar a Ollama. Ejecuta: ollama serve")
-            return "Ollama no está corriendo. Ejecuta 'ollama serve' en otra terminal."
         except Exception as e:
+            if isinstance(e, requests_lib.exceptions.Timeout):
+                log.error("Ollama timeout en generación de código (>120s). Modelo: %s", MODELO)
+                return "Ollama tardó demasiado. Prueba: 'cambia el modelo a qwen2.5:1.5b'"
+            if isinstance(e, requests_lib.exceptions.ConnectionError):
+                log.error("No se puede conectar a Ollama. Ejecuta: ollama serve")
+                return "Ollama no está corriendo. Ejecuta 'ollama serve' en otra terminal."
             log.error("generar_codigo Ollama: %s", e)
             return f"Error generando código: {e}"
 

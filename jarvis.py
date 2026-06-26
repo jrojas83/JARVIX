@@ -151,7 +151,8 @@ Carpetas: {carpetas_lista}
     }
     try:
         t0 = __import__("time").monotonic()
-        r = requests.post(URL_OLLAMA, json=payload, timeout=120)
+        requests_lib = _get_requests()
+        r = requests_lib.post(URL_OLLAMA, json=payload, timeout=120)
         ms = int((__import__("time").monotonic() - t0) * 1000)
         raw = r.json().get("response", "").strip()
         inicio = raw.find("{")
@@ -162,23 +163,24 @@ Carpetas: {carpetas_lista}
         imprimir_estado(f"Ollama respondió en {ms}ms", "ok")
         cache.set(orden, resultado, ttl=TTL_IA)
         return resultado
-    except json.JSONDecodeError as e:
-        log.warning("preguntar_ia_local: Ollama respondió pero no con JSON válido: %s", e)
-        return {"accion": "hablar", "parametros": {"texto": "No entendí bien la respuesta de la IA, ¿puedes repetir?"}}
-    except requests.exceptions.Timeout:
-        log.error(
-            "preguntar_ia_local: Ollama tardó más de 120 segundos. "
-            "En Intel N100 esto puede pasar con modelos de 7B+. "
-            "Considera: 'cambia el modelo a qwen2.5:1.5b' para respuestas más rápidas."
-        )
-        return {"accion": "hablar", "parametros": {"texto": "La IA local tardó demasiado. Prueba cambiar a un modelo más liviano."}}
-    except requests.exceptions.ConnectionError:
-        log.error(
-            "preguntar_ia_local: No se pudo conectar a Ollama en localhost:11434. "
-            "Solución: ejecuta 'ollama serve' en otra terminal."
-        )
-        return {"accion": "hablar", "parametros": {"texto": "Ollama no está corriendo. Ejecuta 'ollama serve' en otra terminal."}}
     except Exception as e:
+        requests_lib = _get_requests()
+        if isinstance(e, requests_lib.exceptions.Timeout):
+            log.error(
+                "preguntar_ia_local: Ollama tardó más de 120 segundos. "
+                "En Intel N100 esto puede pasar con modelos de 7B+. "
+                "Considera: 'cambia el modelo a qwen2.5:1.5b' para respuestas más rápidas."
+            )
+            return {"accion": "hablar", "parametros": {"texto": "La IA local tardó demasiado. Prueba cambiar a un modelo más liviano."}}
+        if isinstance(e, requests_lib.exceptions.ConnectionError):
+            log.error(
+                "preguntar_ia_local: No se pudo conectar a Ollama en localhost:11434. "
+                "Solución: ejecuta 'ollama serve' en otra terminal."
+            )
+            return {"accion": "hablar", "parametros": {"texto": "Ollama no está corriendo. Ejecuta 'ollama serve' en otra terminal."}}
+        if isinstance(e, json.JSONDecodeError):
+            log.warning("preguntar_ia_local: Ollama respondió pero no con JSON válido: %s", e)
+            return {"accion": "hablar", "parametros": {"texto": "No entendí bien la respuesta de la IA, ¿puedes repetir?"}}
         log.error("preguntar_ia_local error inesperado: %s", e, exc_info=True)
         return {"accion": "hablar", "parametros": {"texto": f"Error en la IA local: {e}"}}
 

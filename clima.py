@@ -1,6 +1,7 @@
 # clima.py — Jarvis v5
 # Consulta el clima via OpenWeatherMap (API gratuita).
 # Requiere: pip install requests   (ya está en el proyecto)
+# Lazy loading: requests solo se importa cuando se usa
 #
 # Cómo obtener tu API key GRATIS:
 #   1. Ve a https://openweathermap.org/api
@@ -8,7 +9,16 @@
 #   3. En "My API Keys" copia la key
 #   4. Pégala en config.py → OPENWEATHER_API_KEY
 
-import requests
+_requests_module = None
+
+def _get_requests():
+    """Importa requests bajo demanda (lazy loading)."""
+    global _requests_module
+    if _requests_module is None:
+        import requests
+        _requests_module = requests
+    return _requests_module
+
 from datetime import datetime
 
 # Importar key desde config (puede estar vacía)
@@ -93,7 +103,8 @@ def obtener_clima(ciudad_o_frase=None):
         ciudad = CIUDAD_DEFAULT
 
     try:
-        resp = requests.get(
+        requests_lib = _get_requests()
+        resp = requests_lib.get(
             f"{BASE_URL}/weather",
             params={
                 "q":     ciudad,
@@ -125,11 +136,12 @@ def obtener_clima(ciudad_o_frase=None):
             f"Humedad: {humedad}%. Viento: {viento} km/h."
         )
 
-    except requests.exceptions.ConnectionError:
-        return "Sin conexión a internet para consultar el clima."
-    except requests.exceptions.Timeout:
-        return "El servidor del clima tardó demasiado, intenta de nuevo."
     except Exception as e:
+        requests_lib = _get_requests()
+        if isinstance(e, requests_lib.exceptions.ConnectionError):
+            return "Sin conexión a internet para consultar el clima."
+        if isinstance(e, requests_lib.exceptions.Timeout):
+            return "El servidor del clima tardó demasiado, intenta de nuevo."
         return f"Error consultando el clima: {e}"
 
 
@@ -143,7 +155,8 @@ def obtener_pronostico(ciudad_o_frase=None):
     ciudad = _ciudad_a_query(ciudad_o_frase) if ciudad_o_frase else CIUDAD_DEFAULT
 
     try:
-        resp = requests.get(
+        requests_lib = _get_requests()
+        resp = requests_lib.get(
             f"{BASE_URL}/forecast",
             params={
                 "q":     ciudad,
@@ -181,4 +194,5 @@ def obtener_pronostico(ciudad_o_frase=None):
         return "\n".join(lineas)
 
     except Exception as e:
+        return f"Error en pronóstico: {e}"
         return f"Error en pronóstico: {e}"

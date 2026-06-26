@@ -46,6 +46,9 @@ def abrir_app(nombre_app):
     if cmd:
         subprocess.Popen(cmd.split(), start_new_session=True)
         log.info("App abierta: %s", nombre_app)
+        # Registrar evento en memoria episódica
+        from jarvis_core import episodic_memory as em
+        em.registrar("app_abierta", app=nombre_app, descripcion=f"Abrió {nombre_app}")
         return f"Abriendo {nombre_app}"
     log.warning("App no registrada: %s", nombre_app)
     return f"No tengo registrada la app: {nombre_app}"
@@ -400,3 +403,29 @@ def accion_funcionalidades(tipo, grupo=None):
     elif tipo == "grupo_especifico" and grupo:
         return ayuda_grupo(grupo)
     return ayuda_grupos()
+
+
+# ─── Memoria episódica ────────────────────────────────────────
+def que_hice_hoy():
+    from jarvis_core.episodic_memory import que_hice_hoy as _q
+    return _q()
+
+def que_hice_ayer():
+    from jarvis_core.episodic_memory import que_hice_ayer as _q
+    return _q()
+
+def resumen_del_dia():
+    from jarvis_core.episodic_memory import resumen_del_dia as _r
+    return _r()
+
+def ultima_vez_app(orden: str):
+    # Extrae el nombre de la app/cosa de la orden
+    # Ej: "cuándo usé firefox" → "firefox"
+    palabras_clave = ["usé", "abrí", "ejecuté", "corrí", "vi"]
+    for p in palabras_clave:
+        if p in orden:
+            termino = orden.split(p)[-1].strip()
+            from jarvis_core.episodic_memory import ultima_vez_que_use
+            return ultima_vez_que_use(termino)
+    return "No entendí qué app o acción buscas."
+
