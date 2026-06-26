@@ -1,17 +1,45 @@
 ```
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-venv/
+
+# Dependencies
 .venv/
+venv/
+env/
 .env
 .env.local
 .env.*
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+
+# Coverage
+.coverage
+coverage/
+htmlcov/
+
+# Editors
 .vscode/
 .idea/
-*.log
-*.tmp
+*.sublime-project
+*.sublime-workspace
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+target/
+.gradle/
 ```

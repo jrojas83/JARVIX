@@ -146,9 +146,10 @@ def check_espeak() -> tuple[bool, str]:
 def check_microfono() -> tuple[bool, str]:
     try:
         # Verificar faster-whisper (nuevo sistema de voz offline)
+        # Lazy loading: faster_whisper solo se importa cuando se usa
         from faster_whisper import WhisperModel
         # Carga rápida para verificar disponibilidad
-        model = WhisperModel("tiny", device="cpu", compute_type="int8")
+        _ = WhisperModel("tiny", device="cpu", compute_type="int8")
         return True, "faster-whisper disponible (offline)"
     except ImportError:
         return False, "faster-whisper no instalado: pip install faster-whisper"
