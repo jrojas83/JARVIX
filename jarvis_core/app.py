@@ -37,6 +37,7 @@ from jarvis_core.legacy_bridge import procesar_sin_ia as procesar_sin_ia_legacy
 from jarvis_core.conversation import ConversationEngine, cola_conversacion
 from jarvis_core.semantic_cache import ProcesadorSemantico, construir_intents_jarvix
 from jarvis_core.episodic_memory import inicializar_tabla as _init_episodic
+from jarvis_core.people_memory import inicializar_tabla as _init_people
 
 # ──────────────────────────────────────────────────────────────────────────────
 # CONVERSACIÓN CONTINUA — Configuración
@@ -57,11 +58,21 @@ def _construir_mensajes_ia(orden: str, historial: list[dict]) -> list[dict]:
     """
     Construye la lista completa de mensajes para enviar a la IA:
     [mensaje_sistema] + historial_recortado + [orden_actual]
+    Incluye contexto de personas mencionadas si las hay.
     """
     # Recortar historial si excede el máximo (dejamos espacio para system + nuevo)
     historial_recortado = historial[-(MAX_HISTORIAL - 2):] if len(historial) > MAX_HISTORIAL - 2 else historial
     
-    mensajes = [{"role": "system", "content": MENSAJE_SISTEMA}]
+    # Obtener contexto de personas mencionadas en la orden actual
+    from jarvis_core import people_memory as pm
+    contexto_personas = pm.obtener_contexto_personas(orden, max_personas=3)
+    
+    # Construir mensaje de sistema con contexto adicional si hay personas
+    mensaje_sistema_completo = MENSAJE_SISTEMA
+    if contexto_personas:
+        mensaje_sistema_completo += f"\n\n{contexto_personas}"
+    
+    mensajes = [{"role": "system", "content": mensaje_sistema_completo}]
     mensajes.extend(historial_recortado)
     mensajes.append({"role": "user", "content": orden})
     
@@ -205,6 +216,9 @@ class JarvisApp:
 
         # Inicializar tabla de memoria episódica
         _init_episodic()
+        
+        # Inicializar tabla de memoria de personas
+        _init_people()
 
         self.plugins.load()
 
@@ -216,6 +230,28 @@ class JarvisApp:
         imprimir_banner(version="8", modo=self.cfg.mode, ia_local=True, nombre_usuario=NOMBRE_USUARIO)
         saludo = saludo_contextual()
         await asyncio.to_thread(hablar, saludo)
+        
+        # Verificar cumpleaños próximos al iniciar
+        from jarvis_core import people_memory as pm
+        cumpleanos_proximos = pm.proximos_cumpleanos(dias=3)
+        if cumpleanos_proximos:
+            for cumple in cumpleanos_proximos:
+                dias = cumple["dias_restantes"]
+                nombre = cumple["nombre"]
+                relacion = cumple.get("relacion", "")
+                
+                if dias == 0:
+                    mensaje = f"¡Hoy es el cumpleaños de {nombre}!"
+                    if relacion:
+                        mensaje += f" Tu {relacion} está de fiesta."
+                elif dias == 1:
+                    mensaje = f"Mañana es el cumpleaños de {nombre}."
+                    if relacion:
+                        mensaje += f" Prepara algo especial para tu {relacion}."
+                else:
+                    mensaje = f"En {dias} días es el cumpleaños de {nombre}."
+                
+                await asyncio.to_thread(hablar, mensaje)
 
         historial = _cargar_memoria()
         
@@ -257,6 +293,52 @@ class JarvisApp:
                     _guardar_memoria(historial)
                     respuesta = "He olvidado toda la conversación previa. Empezamos desde cero."
                     imprimir_respuesta(respuesta, fuente="sistema")
+                    await asyncio.to_thread(hablar, respuesta)
+                    continue
+                
+                # Comandos de memoria de personas
+                from jarvis_core import people_memory as pm
+                
+                # Detectar información sobre personas y preguntar si guardar
+                info_persona = pm.detectar_info_persona(orden)
+                if info_persona:
+                    pregunta = pm.generar_pregunta_confirmacion(info_persona)
+                    imprimir_respuesta(pregunta, fuente="personas")
+                    await asyncio.to_thread(hablar, pregunta)
+                    # Esperar confirmación del usuario
+                    confirmacion = await asyncio.to_thread(lambda: input("\nJarvis › ").strip().lower())
+                    if confirmacion in ("sí", "si", "yes", "ok", "dale", "confirma"):
+                        pm.guardar_persona(
+                            nombre=info_persona.get("nombre", ""),
+                            relacion=info_persona.get("relacion", ""),
+                            cumpleanos=info_persona.get("cumpleanos", ""),
+                            gustos=info_persona.get("gustos", ""),
+                            notas=info_persona.get("notas", "")
+                        )
+                        respuesta = f"Guardada la información sobre {info_persona.get('nombre', 'esta persona')}."
+                        imprimir_respuesta(respuesta, fuente="personas")
+                        await asyncio.to_thread(hablar, respuesta)
+                        em.registrar("persona_guardada", descripcion=f"Se guardó información sobre {info_persona.get('nombre')}")
+                    else:
+                        imprimir_respuesta("No guardé la información.", fuente="personas")
+                    continue
+                
+                # Consultas directas sobre personas
+                if "qué sé sobre" in o or "que sé sobre" in o:
+                    respuesta = pm.comando_que_se_sobre(orden)
+                    imprimir_respuesta(respuesta, fuente="personas")
+                    await asyncio.to_thread(hablar, respuesta)
+                    continue
+                
+                if "cuándo cumple" in o or "cuando cumple" in o:
+                    respuesta = pm.comando_cuando_cumple(orden)
+                    imprimir_respuesta(respuesta, fuente="personas")
+                    await asyncio.to_thread(hablar, respuesta)
+                    continue
+                
+                if "actualiza" in o and ("le gusta" in o or "se llama" in o):
+                    respuesta = pm.comando_actualizar_persona(orden)
+                    imprimir_respuesta(respuesta, fuente="personas")
                     await asyncio.to_thread(hablar, respuesta)
                     continue
                 
