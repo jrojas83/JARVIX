@@ -36,6 +36,36 @@ from jarvis_core.legacy_bridge import ejecutar as ejecutar_sync
 from jarvis_core.legacy_bridge import procesar_sin_ia as procesar_sin_ia_legacy
 from jarvis_core.conversation import ConversationEngine, cola_conversacion
 from jarvis_core.semantic_cache import ProcesadorSemantico, construir_intents_jarvix
+from jarvis_core.episodic_memory import inicializar_tabla as _init_episodic
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CONVERSACIÓN CONTINUA — Configuración
+# ──────────────────────────────────────────────────────────────────────────────
+
+MENSAJE_SISTEMA = f"""Eres JARVIX, el asistente personal de {NOMBRE_USUARIO}.
+Corres en Linux y conoces perfectamente el contexto del escritorio.
+Hablas en español de manera natural, conversacional y proactiva.
+Recuerda toda la conversación previa y usa ese contexto para responder.
+Si el usuario hace referencia a "eso que me dijiste", "lo de antes" o similar,
+retoma lo hablado anteriormente en esta conversación.
+""".strip()
+
+MAX_HISTORIAL = 40  # Máximo de mensajes (usuario + assistant) en memoria
+
+
+def _construir_mensajes_ia(orden: str, historial: list[dict]) -> list[dict]:
+    """
+    Construye la lista completa de mensajes para enviar a la IA:
+    [mensaje_sistema] + historial_recortado + [orden_actual]
+    """
+    # Recortar historial si excede el máximo (dejamos espacio para system + nuevo)
+    historial_recortado = historial[-(MAX_HISTORIAL - 2):] if len(historial) > MAX_HISTORIAL - 2 else historial
+    
+    mensajes = [{"role": "system", "content": MENSAJE_SISTEMA}]
+    mensajes.extend(historial_recortado)
+    mensajes.append({"role": "user", "content": orden})
+    
+    return mensajes
 
 
 def _escanear_modelos_ollama() -> list[str]:
@@ -173,6 +203,9 @@ class JarvisApp:
     async def run(self) -> None:
         log.info("Jarvis core iniciado — modo: %s", self.cfg.mode)
 
+        # Inicializar tabla de memoria episódica
+        _init_episodic()
+
         self.plugins.load()
 
         await self.bus.start(workers=2)
@@ -185,7 +218,7 @@ class JarvisApp:
         await asyncio.to_thread(hablar, saludo)
 
         historial = _cargar_memoria()
-
+        
         # Seed macro default v8: "modo trabajo"
         if "trabajo" not in self.memory.state.macros:
             self.memory.state.macros["trabajo"] = [
@@ -211,8 +244,22 @@ class JarvisApp:
 
                 # Registrar interacción del usuario para el motor de conversación
                 self.conversation.registrar_interaccion(orden)
+                
+                # Registrar evento en memoria episódica
+                from jarvis_core import episodic_memory as em
+                em.registrar("orden_recibida", descripcion=orden[:200])
 
                 o = orden.lower().strip()
+                
+                # Comando para limpiar conversación
+                if o in ("nueva conversación", "olvida lo anterior", "reinicia conversación", "borra historial"):
+                    historial.clear()
+                    _guardar_memoria(historial)
+                    respuesta = "He olvidado toda la conversación previa. Empezamos desde cero."
+                    imprimir_respuesta(respuesta, fuente="sistema")
+                    await asyncio.to_thread(hablar, respuesta)
+                    continue
+                
                 if o in ("ayuda", "help"):
                     from jarvis_core.intents.patterns import ayuda_grupos
 
@@ -226,12 +273,12 @@ class JarvisApp:
 
                 imprimir_orden(orden)
                 log.info("Orden recibida: %s", orden[:100])
-                historial.append({"role": "user", "content": orden})
-
+                
                 # v8: Agent mode quick trigger (sintaxis: "agente: ...")
                 if o.startswith("agente:"):
                     objective = orden.split(":", 1)[1].strip()
-                    plan = await self.agent.plan(objective, historial)
+                    mensajes_ia = _construir_mensajes_ia(orden, historial)
+                    plan = await self.agent.plan(objective, mensajes_ia)
                     if not plan:
                         imprimir_estado("No pude planear en modo agente.", "warn")
                         continue
@@ -319,9 +366,10 @@ class JarvisApp:
                         _guardar_memoria(historial)
                     continue
 
-                # 4) IA local (Ollama)
+                # 4) IA local (Ollama) — AHORA CON HISTORIAL COMPLETO + SISTEMA
                 with cronometro("ai") as c:
-                    resp = await self.ai.ask(orden, historial, mode="ollama")
+                    mensajes_ia = _construir_mensajes_ia(orden, historial)
+                    resp = await self.ai.ask(orden, mensajes_ia, mode="ollama")
 
                 if resp and resp.text:
                     imprimir_respuesta(resp.text, fuente=resp.provider, ms=c.ms)

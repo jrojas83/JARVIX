@@ -46,6 +46,9 @@ from jarvis_core.intents.patterns import (
     PATRONES_WA_ABRIR,
     PATRONES_WA_ESTADO,
     PATRONES_WA_CERRAR,
+    PATRONES_MEMORIA_HOY,
+    PATRONES_MEMORIA_AYER,
+    PATRONES_ULTIMA_VEZ,
 )
 
 
@@ -323,6 +326,38 @@ def builtin_intents() -> list[Intent]:
         return {"accion": "hablar", "parametros": {"texto": "Para crear modos/macro, usa: 'modo trabajo' (si ya existe) o edita tu memoria en ~/.jarvis_memory.json por ahora."}}
 
     intents.append(Intent(id="memory.macro.create", match=_match_macro_create))
+
+    # ════════════════════════════════════════════════════════════════
+    # MEMORIA EPISÓDICA
+    # ════════════════════════════════════════════════════════════════
+    intents.append(
+        Intent(
+            id="memory.episodic.today",
+            contains=tuple(PATRONES_MEMORIA_HOY),
+            handler=lambda _raw: {"accion": "que_hice_hoy", "parametros": {}},
+        )
+    )
+    intents.append(
+        Intent(
+            id="memory.episodic.yesterday",
+            contains=tuple(PATRONES_MEMORIA_AYER),
+            handler=lambda _raw: {"accion": "que_hice_ayer", "parametros": {}},
+        )
+    )
+    intents.append(
+        Intent(
+            id="memory.episodic.summary",
+            contains=tuple(["resumen hoy", "resumen ayer", "actividad hoy", "actividad ayer"]),
+            handler=lambda _raw: {"accion": "resumen_del_dia", "parametros": {}},
+        )
+    )
+    
+    def _match_ultima_vez(text: str):
+        if not any(p in text for p in PATRONES_ULTIMA_VEZ):
+            return None
+        return {"accion": "ultima_vez_app", "parametros": {"orden": text}}
+    
+    intents.append(Intent(id="memory.episodic.last_time", match=_match_ultima_vez))
 
     return intents
 
