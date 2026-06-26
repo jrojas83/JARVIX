@@ -98,5 +98,157 @@ def builtin_intents() -> list[Intent]:
 
     intents.append(Intent(id="memory.macro.create", match=_match_macro_create))
 
+    # =========================================================================
+    # MÓDULO 1: WORK MODE - Detector de modo trabajo
+    # =========================================================================
+    def _match_activar_modo_trabajo(text: str):
+        patrones = ['activa modo trabajo', 'voy a programar', 'prepara el entorno', 
+                    'modo dev', 'abre todo para trabajar', 'modo desarrollo']
+        if any(p in text for p in patrones):
+            from jarvis_core.work_mode import activar_modo_trabajo
+            return {"accion": "hablar", "parametros": {"texto": activar_modo_trabajo()}}
+        return None
+
+    def _match_desactivar_modo_trabajo(text: str):
+        patrones = ['desactiva modo trabajo', 'cierra el entorno', 'salir modo trabajo']
+        if any(p in text for p in patrones):
+            from jarvis_core.work_mode import desactivar_modo_trabajo
+            return {"accion": "hablar", "parametros": {"texto": desactivar_modo_trabajo()}}
+        return None
+
+    def _match_estado_modo_trabajo(text: str):
+        patrones = ['estado del modo trabajo', 'está activo el modo trabajo', 'modo trabajo estado']
+        if any(p in text for p in patrones):
+            from jarvis_core.work_mode import estado_modo
+            return {"accion": "hablar", "parametros": {"texto": estado_modo()}}
+        return None
+
+    intents.append(Intent(id="work_mode.activar", match=_match_activar_modo_trabajo))
+    intents.append(Intent(id="work_mode.desactivar", match=_match_desactivar_modo_trabajo))
+    intents.append(Intent(id="work_mode.estado", match=_match_estado_modo_trabajo))
+
+    # =========================================================================
+    # MÓDULO 2: DICTATION - Dictado continuo
+    # =========================================================================
+    def _match_iniciar_dictado(text: str):
+        patrones = ['modo dictado', 'iniciar dictado', 'activa dictado', 
+                    'quiero dictarle', 'escribe lo que digo', 'empieza dictado']
+        if any(p in text for p in patrones):
+            from jarvis_core.dictation import iniciar_dictado
+            return {"accion": "hablar", "parametros": {"texto": iniciar_dictado()}}
+        return None
+
+    def _match_detener_dictado(text: str):
+        patrones = ['detener dictado', 'parar dictado', 'fin dictado', 
+                    'deja de escribir', 'termina dictado']
+        if any(p in text for p in patrones):
+            from jarvis_core.dictation import detener_dictado
+            return {"accion": "hablar", "parametros": {"texto": detener_dictado()}}
+        return None
+
+    def _match_estado_dictado(text: str):
+        patrones = ['estado dictado', 'dictado activo', 'cómo está el dictado']
+        if any(p in text for p in patrones):
+            from jarvis_core.dictation import estado_dictado
+            return {"accion": "hablar", "parametros": {"texto": estado_dictado()}}
+        return None
+
+    intents.append(Intent(id="dictation.iniciar", match=_match_iniciar_dictado))
+    intents.append(Intent(id="dictation.detener", match=_match_detener_dictado))
+    intents.append(Intent(id="dictation.estado", match=_match_estado_dictado))
+
+    # =========================================================================
+    # MÓDULO 3: VOICE NOTES - Notas por voz con etiquetas semánticas
+    # =========================================================================
+    def _match_buscar_notas(text: str):
+        patrones = ['busca en mis notas', 'qué notas tengo de', 'busca notas de', 
+                    'notas sobre ', 'buscar nota']
+        if any(p in text for p in patrones):
+            # Extraer término de búsqueda
+            termino = text
+            for p in patrones:
+                if p in text:
+                    termino = text.split(p, 1)[-1].strip() if p in text else termino
+                    break
+            from jarvis_core.voice_notes import buscar_notas
+            return {"accion": "hablar", "parametros": {"texto": buscar_notas(termino)}}
+        return None
+
+    def _match_listar_notas(text: str):
+        patrones = ['mis notas recientes', 'últimas notas', 'qué anoté hoy', 
+                    'lista mis notas', 'ver notas']
+        if any(p in text for p in patrones):
+            from jarvis_core.voice_notes import listar_notas_recientes
+            return {"accion": "hablar", "parametros": {"texto": listar_notas_recientes()}}
+        return None
+
+    intents.append(Intent(id="voice_notes.buscar", match=_match_buscar_notas))
+    intents.append(Intent(id="voice_notes.listar", match=_match_listar_notas))
+
+    # =========================================================================
+    # MÓDULO 4: HABIT MONITOR - Monitor de hábitos
+    # =========================================================================
+    def _match_registrar_agua(text: str):
+        patrones = ['tomé agua', 'bebí agua', 'ya tomé agua', 'registré agua']
+        if any(p in text for p in patrones):
+            from jarvis_core.habit_monitor import registrar_habito
+            exito = registrar_habito('agua')
+            return {"accion": "hablar", "parametros": {"texto": "Agua registrada" if exito else "Error al registrar"}}
+        return None
+
+    def _match_registrar_descanso(text: str):
+        patrones = ['hice pausa', 'me levanté', 'hice descanso', 'tomé un descanso']
+        if any(p in text for p in patrones):
+            from jarvis_core.habit_monitor import registrar_habito
+            exito = registrar_habito('descanso')
+            return {"accion": "hablar", "parametros": {"texto": "Descanso registrado" if exito else "Error al registrar"}}
+        return None
+
+    def _match_listar_habitos(text: str):
+        patrones = ['mis hábitos', 'cómo van mis hábitos', 'estado de hábitos', 'ver hábitos']
+        if any(p in text for p in patrones):
+            from jarvis_core.habit_monitor import listar_reglas
+            return {"accion": "hablar", "parametros": {"texto": listar_reglas()}}
+        return None
+
+    intents.append(Intent(id="habit.agua", match=_match_registrar_agua))
+    intents.append(Intent(id="habit.descanso", match=_match_registrar_descanso))
+    intents.append(Intent(id="habit.listar", match=_match_listar_habitos))
+
+    # =========================================================================
+    # MÓDULO 5: FILE AGENT - Organizador de archivos agente
+    # =========================================================================
+    def _match_organizar_archivos(text: str):
+        patrones = ['organiza mis descargas', 'organiza la carpeta', 'ordena mis archivos', 
+                    'limpia la carpeta', 'organiza las fotos', 'organiza documentos']
+        if any(p in text for p in patrones):
+            from jarvis_core.file_agent import organizar
+            return {"accion": "hablar", "parametros": {"texto": organizar(text)}}
+        return None
+
+    intents.append(Intent(id="file_agent.organizar", match=_match_organizar_archivos))
+
+    # =========================================================================
+    # MÓDULO 6: FLASHCARDS - Flashcards con algoritmo SM-2
+    # =========================================================================
+    def _match_sesion_repaso(text: str):
+        patrones = ['repasar flashcards', 'sesión de repaso', 'repasar lo que aprendí', 
+                    'mis flashcards de hoy', 'repaso tarjetas']
+        if any(p in text for p in patrones):
+            from jarvis_core.flashcards import sesion_repaso
+            return {"accion": "hablar", "parametros": {"texto": sesion_repaso()}}
+        return None
+
+    def _match_estadisticas_flashcards(text: str):
+        patrones = ['cuántas flashcards tengo', 'estadísticas de flashcards', 
+                    'estado flashcards', 'ver flashcards']
+        if any(p in text for p in patrones):
+            from jarvis_core.flashcards import estadisticas_flashcards
+            return {"accion": "hablar", "parametros": {"texto": estadisticas_flashcards()}}
+        return None
+
+    intents.append(Intent(id="flashcards.repaso", match=_match_sesion_repaso))
+    intents.append(Intent(id="flashcards.estadisticas", match=_match_estadisticas_flashcards))
+
     return intents
 
