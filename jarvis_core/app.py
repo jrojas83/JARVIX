@@ -35,6 +35,7 @@ from jarvis_core.agent.runner import AgentRunner
 from jarvis_core.legacy_bridge import ejecutar as ejecutar_sync
 from jarvis_core.legacy_bridge import procesar_sin_ia as procesar_sin_ia_legacy
 from jarvis_core.conversation import ConversationEngine, cola_conversacion
+from jarvis_core.semantic_cache import ProcesadorSemantico, construir_intents_jarvix
 
 
 def _escanear_modelos_ollama() -> list[str]:
@@ -135,6 +136,28 @@ class JarvisApp:
             check_seg=60,        # Revisa cada minuto
             max_conversaciones_dia=5  # Máximo 5 conversaciones por día
         )
+        # Procesador semántico (cache + intent matcher + IA clasificadora)
+        self._procesador: ProcesadorSemantico | None = None
+
+    def _inicializar_procesador(self) -> ProcesadorSemantico:
+        """Inicializa el procesador semántico con lazy loading."""
+        if self._procesador is not None:
+            return self._procesador
+        
+        import acciones as _acciones
+        from jarvis_core.ia.ollama import llamar_ia as llamar_ia_ollama
+        
+        self._procesador = ProcesadorSemantico(
+            fn_llamar_ia=llamar_ia_ollama,
+            fn_respuesta_libre=llamar_ia_ollama,
+            umbral_cache=0.92,
+            umbral_intent=0.85,
+        )
+        
+        for intent in construir_intents_jarvix(_acciones):
+            self._procesador.registrar_intent(intent)
+        
+        return self._procesador
 
     async def _get_order(self) -> str:
         if self.cfg.mode == "espera":
@@ -191,7 +214,7 @@ class JarvisApp:
 
                 o = orden.lower().strip()
                 if o in ("ayuda", "help"):
-                    from intenciones import ayuda_grupos
+                    from jarvis_core.intents.patterns import ayuda_grupos
 
                     print(ayuda_grupos())
                     print("\n  Escribe 'funcionalidades totales' para ver todos los comandos.")
@@ -229,7 +252,17 @@ class JarvisApp:
                     _guardar_memoria(historial)
                     continue
 
-                # 2) Caché IA (texto libre)
+                # 2) Procesador semántico (cache + intent matcher + IA clasificadora)
+                procesador = self._inicializar_procesador()
+                respuesta_semantica, nivel = procesador.procesar(orden)
+                if respuesta_semantica:
+                    imprimir_respuesta(respuesta_semantica, fuente=nivel)
+                    await asyncio.to_thread(hablar, respuesta_semantica)
+                    historial.append({"role": "assistant", "content": respuesta_semantica})
+                    _guardar_memoria(historial)
+                    continue
+
+                # 3) Caché IA (texto libre) - fallback adicional
                 cached = cache.get(orden, ttl=TTL_IA)
                 if cached is not None and isinstance(cached, str):
                     imprimir_respuesta(cached, fuente="cache")

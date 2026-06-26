@@ -36,7 +36,17 @@
 #  smollm2:1.7b          → 1.7B · ~1.1 GB  · Diseñado para hardware limitado
 # ════════════════════════════════════════════════════════════════════
 
-import requests
+# Lazy loading: requests solo se importa cuando se usa
+_requests_module = None
+
+def _get_requests():
+    """Importa requests bajo demanda (lazy loading)."""
+    global _requests_module
+    if _requests_module is None:
+        import requests
+        _requests_module = requests
+    return _requests_module
+
 import subprocess
 import os
 import time
@@ -180,6 +190,7 @@ def _ollama_activo():
     Verifica si Ollama está corriendo en localhost:11434.
     Timeout corto (2s) para no bloquear el arranque.
     """
+    requests = _get_requests()
     try:
         r = requests.get("http://localhost:11434/", timeout=2)
         return r.status_code == 200
@@ -511,6 +522,7 @@ def generar_codigo(peticion, lenguaje=None, pegar_vscode=True):
 
     if not codigo:
         from config import MODELO, URL_OLLAMA
+        requests = _get_requests()
         log.info("Generando código con Ollama (%s) — puede tardar hasta 2 min", MODELO)
         try:
             r      = requests.post(URL_OLLAMA, json={"model": MODELO, "prompt": prompt, "stream": False}, timeout=120)

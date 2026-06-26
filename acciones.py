@@ -33,7 +33,7 @@ from ia_online import (
     detectar_lenguaje,
     ia_disponible,
 )
-from intenciones import (
+from jarvis_core.intents.patterns import (
     ayuda_grupos,
     ayuda_grupo,
     ayuda_total,
