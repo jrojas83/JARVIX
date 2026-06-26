@@ -8,7 +8,6 @@
 #   3. En "My API Keys" copia la key
 #   4. Pégala en config.py → OPENWEATHER_API_KEY
 
-import requests
 from datetime import datetime
 
 # Importar key desde config (puede estar vacía)
@@ -17,6 +16,17 @@ try:
 except ImportError:
     OPENWEATHER_API_KEY = ""
     CIUDAD_DEFAULT      = "Cali,CO"
+
+# Lazy loading: requests solo se importa cuando se usa
+_requests_module = None
+
+def _get_requests():
+    """Importa requests bajo demanda (lazy loading)."""
+    global _requests_module
+    if _requests_module is None:
+        import requests
+        _requests_module = requests
+    return _requests_module
 
 BASE_URL     = "https://api.openweathermap.org/data/2.5"
 ICONOS_CLIMA = {
@@ -93,6 +103,7 @@ def obtener_clima(ciudad_o_frase=None):
         ciudad = CIUDAD_DEFAULT
 
     try:
+        requests = _get_requests()
         resp = requests.get(
             f"{BASE_URL}/weather",
             params={
@@ -125,11 +136,12 @@ def obtener_clima(ciudad_o_frase=None):
             f"Humedad: {humedad}%. Viento: {viento} km/h."
         )
 
-    except requests.exceptions.ConnectionError:
-        return "Sin conexión a internet para consultar el clima."
-    except requests.exceptions.Timeout:
-        return "El servidor del clima tardó demasiado, intenta de nuevo."
     except Exception as e:
+        err_str = str(e)
+        if "Connection" in err_str or "connect" in err_str.lower():
+            return "Sin conexión a internet para consultar el clima."
+        if "Timeout" in err_str or "timed out" in err_str.lower():
+            return "El servidor del clima tardó demasiado, intenta de nuevo."
         return f"Error consultando el clima: {e}"
 
 

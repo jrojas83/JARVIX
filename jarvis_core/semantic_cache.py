@@ -16,7 +16,6 @@ import time
 import hashlib
 from dataclasses import dataclass, field
 from typing import Callable, Optional
-import numpy as np
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -24,6 +23,7 @@ import numpy as np
 # ──────────────────────────────────────────────────────────────────────────────
 
 _modelo_emb = None
+_np_module = None
 
 def _get_model():
     """Carga el modelo de embeddings solo la primera vez que se necesita."""
@@ -37,13 +37,23 @@ def _get_model():
     return _modelo_emb
 
 
-def _embedding(texto: str) -> np.ndarray:
+def _get_numpy():
+    """Importa numpy bajo demanda (lazy loading)."""
+    global _np_module
+    if _np_module is None:
+        import numpy as np
+        _np_module = np
+    return _np_module
+
+
+def _embedding(texto: str):
     """Genera el vector de embeddings para un texto."""
     return _get_model().encode(texto, normalize_embeddings=True)
 
 
-def _similitud(a: np.ndarray, b: np.ndarray) -> float:
+def _similitud(a, b):
     """Similitud coseno entre dos vectores normalizados. Rango: 0.0 – 1.0"""
+    np = _get_numpy()
     return float(np.dot(a, b))
 
 
@@ -54,7 +64,7 @@ def _similitud(a: np.ndarray, b: np.ndarray) -> float:
 @dataclass
 class _EntradaCache:
     respuesta: str
-    embedding: np.ndarray
+    embedding: object
     hits: int = 0
     creada: float = field(default_factory=time.time)
     ttl_seg: float = 300  # 5 minutos por defecto
@@ -153,13 +163,13 @@ class Intent:
     frases: list[str]
     accion: Callable[[str], str]
     ttl_cache: float = 300  # TTL para guardar en cache si se ejecuta
-    _embeddings: list[np.ndarray] = field(default_factory=list, repr=False)
+    _embeddings: list[object] = field(default_factory=list, repr=False)
 
     def precalcular_embeddings(self):
         """Precalcula embeddings de todas las frases. Llamar al inicio."""
         self._embeddings = [_embedding(f) for f in self.frases]
 
-    def similitud_maxima(self, emb_orden: np.ndarray) -> float:
+    def similitud_maxima(self, emb_orden: object) -> float:
         """Máxima similitud entre la orden y cualquiera de las frases del intent."""
         if not self._embeddings:
             self.precalcular_embeddings()
