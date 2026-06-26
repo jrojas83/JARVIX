@@ -7,6 +7,7 @@ Cómo funciona:
   - Corre en un hilo daemon (no bloquea el bucle principal de jarvis.py)
   - Se comunica con jarvis.py mediante una cola thread-safe (queue.Queue)
   - jarvis.py saca mensajes de esa cola en su bucle y los habla con hablar()
+  - Lee configuración dinámica desde ~/.jarvis_config.json en cada ciclo
 
 Integración — 3 cambios en jarvis.py (ver INTEGRACION.md):
   from jarvis_core.autonomy import AutonomyEngine, cola_autonomia
@@ -33,6 +34,7 @@ log = logging.getLogger("jarvis.autonomy")
 cola_autonomia: queue.Queue = queue.Queue()
 
 MEMORIA_FILE = Path.home() / ".jarvis_memory.json"
+CONFIG_FILE = Path.home() / ".jarvis_config.json"
 
 _DIAS_ES = {
     "monday": "lunes", "tuesday": "martes", "wednesday": "miércoles",
@@ -147,6 +149,18 @@ class AutonomyEngine:
         hora = now.strftime("%H:%M")
         dia = _DIAS_ES.get(now.strftime("%A").lower(), "")
 
+        # Leer configuración dinámica para respetar horarios de silencio y días no molestar
+        config = self._leer_configuracion()
+        
+        # Verificar si estamos en horario de silencio
+        if self._en_horario_silencio(config, hora, dia):
+            return  # No disparar rutinas en horario de silencio
+        
+        # Verificar si hoy es día de no molestar
+        dias_no_molestar = config.get("dias_no_molestar", [])
+        if dia in dias_no_molestar:
+            return  # No disparar rutinas en días de no molestar
+
         for r in self._leer_rutinas():
             if not r.get("activa"):
                 continue
@@ -165,6 +179,41 @@ class AutonomyEngine:
 
             log.info("[AUTONOMY] Rutina disparada: %s", r["id"])
             self._emitir(r.get("mensaje", r["desc"]))
+    
+    def _leer_configuracion(self) -> dict:
+        """Lee la configuración dinámica desde ~/.jarvis_config.json"""
+        try:
+            if CONFIG_FILE.exists():
+                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                    return json.load(f)
+        except Exception as e:
+            log.warning("[AUTONOMY] Error leyendo configuración: %s", e)
+        return {}
+    
+    def _en_horario_silencio(self, config: dict, hora_actual: str, dia: str) -> bool:
+        """Verifica si la hora actual está dentro del horario de silencio."""
+        horario = config.get("horario_silencio", {})
+        inicio = horario.get("inicio")
+        fin = horario.get("fin")
+        
+        if not inicio or not fin:
+            return False
+        
+        # Verificar días excluidos del horario de silencio
+        dias_excluidos = horario.get("dias_excluidos", [])
+        if dia in dias_excluidos:
+            return False
+        
+        try:
+            # Comparar horas como strings (formato HH:MM)
+            if inicio < fin:
+                # Horario normal (ej: 21:00 - 08:00 no aplica aquí)
+                return inicio <= hora_actual < fin
+            else:
+                # Horario cruzado (ej: 21:00 - 08:00 significa noche-mañana)
+                return hora_actual >= inicio or hora_actual < fin
+        except Exception:
+            return False
 
     def _check_inactividad(self):
         if self.inactividad_min <= 0:
